@@ -86,14 +86,16 @@ def create_input_to_predict(idcam_string, path_of_images):
     return X_test
 
 
-def print_percentage(index):
-    print str(index / DIM_OUTPUT_FEATURE_LAYER * 100) + '%'
+def print_percentage(index, num_tot_iteration):
+    index = index * 1.0
+    percentage = (index / num_tot_iteration) * 100.0
+    print '%01d' % percentage + '%'
 
 
 def fill_feature_matrix(feature_matrix, string_idcam_vector_, model, path_of_images):
     index = 0
     for string in string_idcam_vector_:
-        print_percentage(index)
+        print_percentage(index, len(string_idcam_vector_))
         prediction = model.predict(create_input_to_predict(string[0], path_of_images))
         prediction = prediction.transpose()
         feature_matrix[:, index] = prediction.squeeze()
@@ -133,7 +135,7 @@ def my_pdist(vectorA, vectorB):
 
 halfGPU()
 
-model_VGG = get_model_for_feature_extraction('/home/jansaldi/models/Resnet_Market.h5', NAME_FEATURE_EXTRACTION_LAYER)
+model = get_model_for_feature_extraction('/home/jansaldi/models/Resnet_Market.h5', NAME_FEATURE_EXTRACTION_LAYER)
 
 query_id = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryID.mat')
 query_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryCam.mat')
@@ -150,9 +152,9 @@ prob_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_query)))
 gallery_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_gallery)))
 
 print('PROB_FEATURE_FILL:')
-prob_feature = fill_feature_matrix(prob_feature, string_query_vector, model_VGG, path_query)
+prob_feature = fill_feature_matrix(prob_feature, string_query_vector, model, path_query)
 print('GALLERY_FEATURE_FILL:')
-gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, model_VGG, path_gallery)
+gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, model, path_gallery)
 
 
 print " dim gallery_feature: " + str(gallery_feature.shape)

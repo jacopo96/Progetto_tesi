@@ -13,8 +13,8 @@ from keras.applications.resnet50 import conv_block, identity_block
 NUM_OF_CHARACTERS_OF_ID = 4
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
-NUM_LAYERS_TO_FREEZE = 174
-NUM_EPOCHS = 10
+NUM_LAYERS_TO_FREEZE = 0
+NUM_EPOCHS = 5
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
@@ -95,7 +95,7 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
     for filename in listing:
         if filename.endswith(".jpg"):
             # create x_train
-            image = image_read(path_train + filename).resize(shape_input_nn[0:2])
+            image = image_read(path_train + filename).resize(shape_input_nn[0:2]).astype('float32')
             X_train[index, :, :, :] = prepare_x_train(image)
 
             # create Y_train
@@ -175,7 +175,7 @@ def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learnin
     # compile the model with SGD and a very slow learning rate
     sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
     model_to_fine_tune.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=1)
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2)
     return model_to_fine_tune
 
 
