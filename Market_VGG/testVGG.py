@@ -123,7 +123,7 @@ def my_pdist(vectorA, vectorB):
 
 halfGPU()
 
-model_VGG = get_model_for_feature_extraction('/home/jansaldi/models/VGG_Market.h5', 'dense_2')
+model_VGG = get_model_for_feature_extraction('/home/jansaldi/Progetto-tesi/models/VGG_Market.h5', 'dense_2')
 
 query_id = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryID.mat')
 query_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryCam.mat')

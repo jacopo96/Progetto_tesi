@@ -13,7 +13,7 @@ NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [224, 224, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten_2'
-NAME_MODEL_TO_LOAD = 'Resnet_Market.h5'
+NAME_MODEL_TO_LOAD = 'Resnet_Market_flipped_imgs.h5'
 
 
 def halfGPU():
@@ -136,7 +136,7 @@ def my_pdist(vectorA, vectorB):
 
 halfGPU()
 
-model = get_model_for_feature_extraction('/home/jansaldi/models/' + NAME_MODEL_TO_LOAD, NAME_FEATURE_EXTRACTION_LAYER)
+model = get_model_for_feature_extraction('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_LOAD, NAME_FEATURE_EXTRACTION_LAYER)
 
 query_id = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryID.mat')
 query_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryCam.mat')
@@ -161,8 +161,8 @@ gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, mo
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature.mat', mdict={'gal': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature.mat', mdict={'prob': prob_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature_flipped_imgs.mat', mdict={'gal': gallery_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature_flipped_imgs.mat', mdict={'prob': prob_feature})
 
 #gallery_feature = normalize(gallery_feature)
 #probability_feature = normalize(prob_feature)

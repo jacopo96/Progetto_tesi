@@ -18,6 +18,7 @@ NUM_EPOCHS = 5
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
+NAME_MODEL_TO_SAVE = 'Resnet_Market_flipped_imgs.h5'
 
 
 def halfGPU():
@@ -143,7 +144,7 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
-def create_Resnet_Model(num_classes):
+def create_resnet_model(num_classes):
     # @input: num of classes of the new final softmax layer, num layers to freeze
     # @output: Resnet final model with new softmax layer at the end
 
@@ -221,9 +222,9 @@ print "num of identities: " + str(num_ID)
 # traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
 traindata_with_flippedimages = create_trainData_flippedImages(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
 
-model = create_Resnet_Model(num_ID)
+model = create_resnet_model(num_ID)
 model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
 model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata_with_flippedimages, LEARNING_RATE)
-model.save('/home/jansaldi/models/Resnet_Market_flipped_imgs.h5')
+model.save('/home/jansaldi/models/' + NAME_MODEL_TO_SAVE)
 
 
