@@ -84,8 +84,37 @@ def prepare_y_train(id_int_dictionary, filename, num_id):
     return y
 
 
+def create_trainData_flippedImages(shape_input_nn, path_train, id_int_dict, num_id):
+    # @input : size of images, path of training images, dict and num of id
+    # @output : X_train and Y_train
+    listing = os.listdir(path_train)
+    num_imgs = count_images(path_train)
+    X_train = np.empty((2*num_imgs, shape_input_nn[0], shape_input_nn[1], shape_input_nn[2]), 'float32')
+    Y_train = np.empty((2*num_imgs, num_id), 'float32')
+    index = 0
+    for filename in listing:
+        if filename.endswith(".jpg"):
+            # create x_train image
+            image = image_read(path_train + filename).resize(shape_input_nn[0:2])
+            X_train[index, :, :, :] = prepare_x_train(image)
+
+            # create Y_train
+            y = prepare_y_train(id_int_dict, filename, num_id)
+            Y_train[index, :] = y
+            index += 1
+
+            #create x_train flipped image
+            flipped_image = np.flip(image, 1)
+            X_train[index, :, :, :] = prepare_x_train(flipped_image)
+            Y_train[index, :] = y
+
+    print "dimensione x_train: " + str(X_train.shape)
+    print "dimensione y_train: " + str(Y_train.shape)
+    return X_train, Y_train
+
+
 def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
-    # @input : size of images, path of training images
+    # @input : size of images, path of training images,dict and num of id
     # @output : X_train and Y_train
     listing = os.listdir(path_train)
     num_imgs = count_images(path_train)
@@ -95,7 +124,7 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
     for filename in listing:
         if filename.endswith(".jpg"):
             # create x_train
-            image = image_read(path_train + filename).resize(shape_input_nn[0:2]).astype('float32')
+            image = image_read(path_train + filename).resize(shape_input_nn[0:2])
             X_train[index, :, :, :] = prepare_x_train(image)
 
             # create Y_train
@@ -114,7 +143,7 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
-def create_Resnet_Model(num_classes, n_layers_to_freeze):
+def create_Resnet_Model(num_classes):
     # @input: num of classes of the new final softmax layer, num layers to freeze
     # @output: Resnet final model with new softmax layer at the end
 
@@ -164,9 +193,6 @@ def create_Resnet_Model(num_classes, n_layers_to_freeze):
     #creating the new model
     resnet_model = Model(img_input, x_new_fc)
 
-    #freeze layers
-    resnet_model = freeze_layers(resnet_model, n_layers_to_freeze)
-
     print resnet_model.summary()
     return resnet_model
 
@@ -183,13 +209,21 @@ halfGPU()
 
 # path of market
 path_traindata='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
-dictionary = count_id(path_traindata)
+id_int_dictionary = count_id(path_traindata)
 
-num_ID = len(dictionary)
+num_ID = len(id_int_dictionary)
 print "num of identities: " + str(num_ID)
 
-traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, dictionary, num_ID)
+# use one of the following 2 lines of code for choosing to train data normally or with data augmentation
+# then replace in fine_tune_model the correct parameter for trained data and eventually the name of the model
+# to save in the next line
 
-model = create_Resnet_Model(num_ID, NUM_LAYERS_TO_FREEZE)
-model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata, LEARNING_RATE)
-model.save('/home/jansaldi/models/Resnet_Market.h5')
+# traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
+traindata_with_flippedimages = create_trainData_flippedImages(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
+
+model = create_Resnet_Model(num_ID)
+model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
+model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata_with_flippedimages, LEARNING_RATE)
+model.save('/home/jansaldi/models/Resnet_Market_flipped_imgs.h5')
+
+
