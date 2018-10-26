@@ -2,8 +2,7 @@ import keras
 from keras.preprocessing.image import img_to_array
 from keras.models import Sequential
 from keras import optimizers
-from keras.applications.vgg16 import VGG16
-from keras.layers import Dense, Flatten, Dropout
+from keras.layers import Dense, Flatten, Dropout, ZeroPadding2D, Convolution2D, MaxPooling2D
 from PIL import Image
 import os
 import numpy as np
@@ -119,20 +118,59 @@ def create_vgg_model(num_classes):
     # create VGG base model(ATT: USING THE KERAS VGG MODEL I GET SOME ERRORS ON THE LAST 2 FULLY CONNECTED LAYERS.
     # FOR THIS REASON I USE INCLUDE_TOP=FALSE AND I ADD THEM MANUALLY TO RECREATE THE CLASSIC VGG16 STRUCTURE
     # i use a sequential model because the VGG16 keras model doesn't have an "add" method to add new layers
-    vgg_model = VGG16(weights='None', include_top=False, input_shape=(224, 224, 3))
-    new_model = Sequential()
-    for layer in vgg_model.layers:
-        new_model.add(layer)
+    model = Sequential()
+    model.add(ZeroPadding2D((1, 1), input_shape=(3, 224, 224)))
+    model.add(Convolution2D(64, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, 3, 3, activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+    print model.summary()
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, 3, 3, activation='relu'))
+    print model.summary()
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    new_model.add(Flatten())
-    new_model.add(Dense(4096, activation='relu'))
-    new_model.add(Dropout(0.5))
-    new_model.add(Dense(4096, activation='relu'))
-    new_model.add(Dropout(0.5))
-    new_model.add(Dense(num_classes, activation='softmax'))
-    print new_model.summary()
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(256, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(256, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(256, 3, 3, activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    return new_model
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(512, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(512, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(512, 3, 3, activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(512, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(512, 3, 3, activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(512, 3, 3, activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(4096, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(4096, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1000, activation='softmax'))
+
+    model.load_weights('/home/jansaldi/Progetto-tesi/Market_VGG/weights/vgg16_weights.h5')
+
+    model.layers.pop()
+    model.outputs = [model.layers[-1].output]
+    model.layers[-1].outbound_nodes = []
+    model.add(Dense(num_classes, activation='softmax'))
+
+    return model
 
 
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learning_rate):
@@ -156,7 +194,8 @@ traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, dictionary, num_ID)
 
 vgg_model = create_vgg_model(num_ID)
 vgg_model = freeze_layers(vgg_model, NUM_LAYERS_TO_FREEZE)
+print vgg_model.summary()
 vgg_model = fine_tune_model(vgg_model, NUM_EPOCHS, BATCH_SIZE, traindata, LEARNING_RATE)
-vgg_model.save('/home/jansaldi/models/VGG_Market.h5')
+vgg_model.save('/home/jansaldi/Progetto-tesi/models/VGG_Market.h5')
 
 
