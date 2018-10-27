@@ -104,34 +104,6 @@ def fill_feature_matrix(feature_matrix, string_idcam_vector_, model, path_of_ima
     return feature_matrix
 
 
-def normalize(feature_vector):
-    # @input: vector to be normalized
-    # @output: normalized vector
-    sum_val = np.sqrt(sum(np.square(feature_vector)))
-    # check if sum is on columns
-    for i in range(len(feature_vector[:, 0])):
-        feature_vector[i, :] = feature_vector[i, :] / sum_val
-    return feature_vector
-
-
-def my_pdist(vectorA, vectorB):
-    # @input: 2 matrixes nxd and mxd
-    # #output: euclidean distance of 2 matrixes point to point nxm
-    squared_A = np.square(vectorA)
-    squared_B = np.square(vectorB)
-    row_sum_A = np.sum(squared_A, axis=1)
-    row_sum_B = np.sum(squared_B, axis=1)
-
-    # code to make them row and column vectors
-    row_sum_A = row_sum_A[:, np.newaxis]
-    row_sum_B = row_sum_B[np.newaxis, :]
-
-    double_product = 2 * np.dot(vectorA, np.transpose(vectorB))
-
-    eucliden_distance = np.sqrt(row_sum_A + row_sum_B - double_product)
-    return eucliden_distance
-
-
 #test trained networks on test data
 
 halfGPU()
@@ -164,11 +136,6 @@ print " dim prob_feature: " + str(prob_feature.shape)
 sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature_flipped_imgs.mat', mdict={'gal': gallery_feature})
 sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature_flipped_imgs.mat', mdict={'prob': prob_feature})
 
-#gallery_feature = normalize(gallery_feature)
-#probability_feature = normalize(prob_feature)
-
-#euclidean_distance = my_pdist(gallery_feature.transpose(), prob_feature.transpose())
-#print euclidean_distance.shape
 
 
 
