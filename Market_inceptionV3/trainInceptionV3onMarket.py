@@ -2,7 +2,7 @@ import keras
 from keras import optimizers, Model
 from keras.applications import InceptionV3
 from keras.preprocessing.image import img_to_array
-from keras.layers import Dense, Flatten, AveragePooling2D
+from keras.layers import Dense, AveragePooling2D, Flatten
 from PIL import Image
 import os
 import numpy as np
@@ -11,12 +11,13 @@ from keras.backend.tensorflow_backend import set_session
 NUM_OF_CHARACTERS_OF_ID = 4
 GPU_FRACTION = 0.5
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
-NUM_LAYERS_TO_FREEZE = 249
+NUM_LAYERS_TO_FREEZE = 0
 NUM_EPOCHS = 10
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = [299, 299, 3]
 BATCH_SIZE = 16
-
+WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/weights/inception_v3_weights_tf_dim_ordering_tf_kernels.h5'
+TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
 
 def halfGPU():
     config = tf.ConfigProto()
@@ -29,24 +30,24 @@ def count_id(path):
     # @output : dictionary of ID-integers to build keras input labels
     listing = os.listdir(path)
     #dictionary = dictionary for conversion from ID to continuous mapping output (key :ID to integer from 0 to 750)
-    dictionary = {}
+    id_int_dictionary = {}
     index = 0
     for filename in listing:
         if filename.endswith('.jpg'):
             # ID indice ID immagine
             ID = filename[:NUM_OF_CHARACTERS_OF_ID]
             if index == 0:
-                dictionary[ID] = index
+                id_int_dictionary[ID] = index
                 index += 1
             else:
                 is_not_already_listed = True
-                for keys in dictionary:
+                for keys in id_int_dictionary:
                     if keys == ID:
                         is_not_already_listed = False
                 if is_not_already_listed:
-                    dictionary[ID] = index
+                    id_int_dictionary[ID] = index
                     index += 1
-    return dictionary
+    return id_int_dictionary
 
 
 def count_images(path_traindata):
@@ -111,56 +112,50 @@ def freeze_layers(model_to_freeze, num_layers_to_freeze):
     return model_to_freeze
 
 
-def create_inceptionV3_model(n_classes, shape_input_nn):
+def create_inceptionV3_model(n_classes, shape_input_nn, learning_rate):
     # @input: num of classes of the new final layer and num of layers to freeze
     # @output: InceptionV3 final model with new softmax layer at the end
     base_model = InceptionV3(include_top=False, weights='imagenet', input_shape=shape_input_nn)
 
     # Fully Connected Softmax Layer
     x = base_model.output
-    x_fc = AveragePooling2D((8, 8), strides=(8, 8), name='avg_pool')(x)
-    x_fc = Flatten(name='flatten')(x_fc)
-    x_fc = Dense(n_classes, activation='softmax', name='predictions')(x_fc)
+    x_new_fc = AveragePooling2D((8, 8), strides=(8, 8), name='avg_pool')(x)
+    x_new_fc = Flatten(name='flatten')(x_new_fc)
+    x_new_fc = Dense(n_classes, activation='softmax', name='predictions')(x_new_fc)
 
-    #creating final model
-    final_model = Model(base_model.input, x_fc)
+      # creating final model
+    final_model = Model(base_model.input, x_new_fc)
 
+    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    final_model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return final_model
-
-
-def count_layers(nn_model):
-    num_layers = len(nn_model.layers)
-    return num_layers
 
 
 def print_layers(nn_model):
     for i, layer in enumerate(nn_model.layers):
-        print i + layer.name
+        print str(i) + layer.name
 
 
-def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learning_rate):
+def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     # compile the model with SGD and a very slow learning rate
-    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
-    model_to_fine_tune.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size, verbose=1)
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size, verbose=2)
     return model_to_fine_tune
+
 
 
 halfGPU()
 
 # path of market
-path_traindata='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
-dictionary = count_id(path_traindata)
+dictionary = count_id(TRAINDATA_PATH)
 
 num_ID = len(dictionary)
 print "num of identities: " + str(num_ID)
 
-traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, dictionary, num_ID)
+traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
 
-inceptionv3 = create_inceptionV3_model(num_ID, SHAPE_INPUT_NN)
-num_layers = count_layers(inceptionv3)
-# print_layers(inceptionv3)
+inceptionv3 = create_inceptionV3_model(num_ID, SHAPE_INPUT_NN, LEARNING_RATE)
+#print_layers(inceptionv3)
 freeze_layers(inceptionv3, NUM_LAYERS_TO_FREEZE)
 print inceptionv3.summary()
-inceptionv3 = fine_tune_model(inceptionv3, NUM_EPOCHS, BATCH_SIZE, traindata, LEARNING_RATE)
+inceptionv3 = fine_tune_model(inceptionv3, NUM_EPOCHS, BATCH_SIZE, traindata)
 inceptionv3.save('/home/jansaldi/Progetto-tesi/models/inceptionV3_Market.h5')

@@ -14,6 +14,8 @@ SHAPE_INPUT_NN = [299, 299, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten'
 NAME_MODEL_TO_LOAD = 'inceptionV3_Market.h5'
+PATH_IN_WHICH_SAVE_GALLERY_FEATURE = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/gallery_feature.mat'
+PATH_IN_WHICH_SAVE_PROB_FEATURE = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/prob_feature.mat'
 
 
 def halfGPU():
@@ -41,7 +43,7 @@ def count_images(path_data):
     return num_imgs
 
 
-def build_idcam_string(id_vector, cam_vector):
+def build_idcam_string_vector(id_vector, cam_vector):
     # @input: vector of id and vector of cam that identify every image
     # @output: vector of the same dim of the inputs that contains the strings to identify every image in the correct format
     string_vector = np.empty(id_vector.shape, dtype=np.object_)
@@ -90,7 +92,7 @@ def create_input_to_predict(idcam_string, path_of_images):
 def print_percentage(index, num_tot_iteration):
     index = index * 1.0
     percentage = (index / num_tot_iteration) * 100.0
-    print '%01d' % percentage + '%'
+    print '{0:.2f}%'.format(percentage)
 
 
 def fill_feature_matrix(feature_matrix, string_idcam_vector_, model, path_of_images):
@@ -117,8 +119,8 @@ test_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/testCam.mat')
 path_query = '/media/data/dataset/Market-1501-v15.09.15/query/'
 path_gallery = '/media/data/dataset/Market-1501-v15.09.15/bounding_box_test/'
 
-string_query_vector = build_idcam_string(query_id['queryID'], query_cam['queryCAM'])
-string_gallery_vector = build_idcam_string(test_id["testID"], test_cam['testCAM'])
+string_query_vector = build_idcam_string_vector(query_id['queryID'], query_cam['queryCAM'])
+string_gallery_vector = build_idcam_string_vector(test_id["testID"], test_cam['testCAM'])
 
 prob_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_query)))
 gallery_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_gallery)))
@@ -132,8 +134,8 @@ gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, mo
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/gallery_feature.mat', mdict={'gal': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/prob_feature.mat', mdict={'prob': prob_feature})
+sio.savemat(PATH_IN_WHICH_SAVE_GALLERY_FEATURE, mdict={'gal': gallery_feature})
+sio.savemat(PATH_IN_WHICH_SAVE_PROB_FEATURE, mdict={'prob': prob_feature})
 
 
 

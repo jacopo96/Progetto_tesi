@@ -1,8 +1,9 @@
 import keras
 from keras.preprocessing.image import img_to_array
 from keras.models import Sequential
+from keras.applications.vgg16 import VGG16
 from keras import optimizers
-from keras.layers import Dense, Flatten, Dropout, ZeroPadding2D, Convolution2D, MaxPooling2D
+from keras.layers import Dense
 from PIL import Image
 import os
 import numpy as np
@@ -16,6 +17,7 @@ NUM_EPOCHS = 10
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = [224, 224, 3]
 BATCH_SIZE = 16
+TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
 
 
 def halfGPU():
@@ -111,72 +113,29 @@ def freeze_layers(model_to_freeze, num_layers_to_freeze):
     return model_to_freeze
 
 
-def create_vgg_model(num_classes):
+def create_vgg_model(num_classes,shape_input_nn, learing_rate):
     # @input: num of classes of the new final softmax layer, num of layers to freeze
     # @output: VGG final model with new softmax layer at the end
 
     # create VGG base model(ATT: USING THE KERAS VGG MODEL I GET SOME ERRORS ON THE LAST 2 FULLY CONNECTED LAYERS.
     # FOR THIS REASON I USE INCLUDE_TOP=FALSE AND I ADD THEM MANUALLY TO RECREATE THE CLASSIC VGG16 STRUCTURE
     # i use a sequential model because the VGG16 keras model doesn't have an "add" method to add new layers
+    vgg_model = VGG16(include_top=False, weights='imagenet', input_shape=shape_input_nn)
     model = Sequential()
-    model.add(ZeroPadding2D((1, 1), input_shape=(3, 224, 224)))
-    model.add(Convolution2D(64, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(64, 3, 3, activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-    print model.summary()
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(128, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(128, 3, 3, activation='relu'))
-    print model.summary()
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    model.add(Flatten())
-    model.add(Dense(4096, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(4096, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(1000, activation='softmax'))
-
-    model.load_weights('/home/jansaldi/Progetto-tesi/Market_VGG/weights/vgg16_weights.h5')
-
+    for layer in vgg_model.layers:
+        model.add(layer)
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
     model.add(Dense(num_classes, activation='softmax'))
 
+    sgd = optimizers.SGD(lr=learing_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return model
 
 
-def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learning_rate):
+def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     # compile the model with SGD and a very slow learning rate
-    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
-    model_to_fine_tune.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size, verbose=1)
     return model_to_fine_tune
 
@@ -184,18 +143,17 @@ def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learnin
 halfGPU()
 
 # path of market
-path_traindata='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
-dictionary = count_id(path_traindata)
+dictionary = count_id(TRAINDATA_PATH)
 
 num_ID = len(dictionary)
 print "num of identities: " + str(num_ID)
 
-traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, dictionary, num_ID)
+traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
 
-vgg_model = create_vgg_model(num_ID)
+vgg_model = create_vgg_model(num_ID,SHAPE_INPUT_NN, LEARNING_RATE)
 vgg_model = freeze_layers(vgg_model, NUM_LAYERS_TO_FREEZE)
 print vgg_model.summary()
-vgg_model = fine_tune_model(vgg_model, NUM_EPOCHS, BATCH_SIZE, traindata, LEARNING_RATE)
+vgg_model = fine_tune_model(vgg_model, NUM_EPOCHS, BATCH_SIZE, traindata)
 vgg_model.save('/home/jansaldi/Progetto-tesi/models/VGG_Market.h5')
 
 

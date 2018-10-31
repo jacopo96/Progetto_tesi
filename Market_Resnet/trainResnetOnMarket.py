@@ -18,6 +18,8 @@ NUM_EPOCHS = 5
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
+TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
+WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/weights/resnet50_tf_weights_imagenet.h5'
 NAME_MODEL_TO_SAVE = 'Resnet_Market_flipped_imgs.h5'
 
 
@@ -28,7 +30,7 @@ def halfGPU():
 
 
 def count_id(path):
-    # @input : path of Market
+    # @input : path of Market train data
     # @output : dictionary of ID-integers to build keras input labels
     listing = os.listdir(path)
     #dictionary = dictionary for conversion from ID to continuous mapping output (key :ID, integer from 0 to 750)
@@ -144,12 +146,12 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
-def create_resnet_model(num_classes):
+def create_resnet_model(num_classes, learning_rate, shape_input_nn):
     # @input: num of classes of the new final softmax layer, num layers to freeze
     # @output: Resnet final model with new softmax layer at the end
 
     #creating Resnet network
-    img_input = Input(shape=SHAPE_INPUT_NN)
+    img_input = Input(shape= shape_input_nn)
     bn_axis = 3
     x = ZeroPadding2D(padding=(3, 3), name='conv1_pad')(img_input)
     x = Conv2D(64, (7, 7), strides=(2, 2), padding='valid', name='conv1')(x)
@@ -184,7 +186,7 @@ def create_resnet_model(num_classes):
     resnet_model = Model(img_input, x_fc)
 
     # load weights
-    resnet_model.load_weights('/home/jansaldi/Progetto-tesi/Market_Resnet/weights/resnet50_tf_weights_imagenet.h5')
+    resnet_model.load_weights(WEIGHTS_PATH)
 
     #creating new last softmax layer
     x_new_fc = AveragePooling2D((7, 7), name='avg_pool')(x)
@@ -194,14 +196,13 @@ def create_resnet_model(num_classes):
     #creating the new model
     resnet_model = Model(img_input, x_new_fc)
 
-    print resnet_model.summary()
+    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    resnet_model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+
     return resnet_model
 
 
-def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learning_rate):
-    # compile the model with SGD and a very slow learning rate
-    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
-    model_to_fine_tune.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2)
     return model_to_fine_tune
 
@@ -209,8 +210,7 @@ def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata, learnin
 halfGPU()
 
 # path of market
-path_traindata='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
-id_int_dictionary = count_id(path_traindata)
+id_int_dictionary = count_id(TRAINDATA_PATH)
 
 num_ID = len(id_int_dictionary)
 print "num of identities: " + str(num_ID)
@@ -220,11 +220,12 @@ print "num of identities: " + str(num_ID)
 # to save in the next line
 
 # traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
-traindata_with_flippedimages = create_trainData_flippedImages(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
+traindata_with_flippedimages = create_trainData_flippedImages(SHAPE_INPUT_NN, TRAINDATA_PATH, id_int_dictionary, num_ID)
 
-model = create_resnet_model(num_ID)
+model = create_resnet_model(num_ID, LEARNING_RATE, SHAPE_INPUT_NN)
+print model.summary()
 model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
-model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata_with_flippedimages, LEARNING_RATE)
-model.save('/home/jansaldi/models/' + NAME_MODEL_TO_SAVE)
+model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata_with_flippedimages)
+model.save('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE)
 
 
