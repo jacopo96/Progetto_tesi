@@ -16,7 +16,7 @@ NUM_LAYERS_TO_FREEZE = 0
 NUM_EPOCHS = 10
 LEARNING_RATE = 0.001
 SHAPE_INPUT_NN = (224, 224, 3)
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
 
 
