@@ -12,10 +12,10 @@ from keras.backend.tensorflow_backend import set_session
 NUM_OF_CHARACTERS_OF_ID = 4
 GPU_FRACTION = 0.5
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
-NUM_LAYERS_TO_FREEZE = 24
+NUM_LAYERS_TO_FREEZE = 0
 NUM_EPOCHS = 10
-LEARNING_RATE = 1e-3
-SHAPE_INPUT_NN = [224, 224, 3]
+LEARNING_RATE = 0.001
+SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
 TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
 
@@ -106,6 +106,17 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
     return X_train, Y_train
 
 
+def print_layers(nn_model):
+    for i, layer in enumerate(nn_model.layers):
+        print str(i) + layer.name
+
+
+def print_train_parameters():
+    print "Learning rate :" + str(LEARNING_RATE)
+    print "num. of epochs: " + str(NUM_EPOCHS)
+    print "freezed layers:" + str(NUM_LAYERS_TO_FREEZE)
+
+
 def freeze_layers(model_to_freeze, num_layers_to_freeze):
     # freeze the weights of first layers
     for layer in model_to_freeze.layers[:num_layers_to_freeze]:
@@ -113,23 +124,19 @@ def freeze_layers(model_to_freeze, num_layers_to_freeze):
     return model_to_freeze
 
 
-def create_vgg_model(num_classes,shape_input_nn, learing_rate):
+def create_vgg_model(num_classes,shape_input_nn, learning_rate):
     # @input: num of classes of the new final softmax layer, num of layers to freeze
     # @output: VGG final model with new softmax layer at the end
 
-    # create VGG base model(ATT: USING THE KERAS VGG MODEL I GET SOME ERRORS ON THE LAST 2 FULLY CONNECTED LAYERS.
-    # FOR THIS REASON I USE INCLUDE_TOP=FALSE AND I ADD THEM MANUALLY TO RECREATE THE CLASSIC VGG16 STRUCTURE
     # i use a sequential model because the VGG16 keras model doesn't have an "add" method to add new layers
-    vgg_model = VGG16(include_top=False, weights='imagenet', input_shape=shape_input_nn)
+    vgg_model = VGG16(include_top=True, weights='imagenet', input_shape=shape_input_nn)
     model = Sequential()
     for layer in vgg_model.layers:
         model.add(layer)
     model.layers.pop()
-    model.outputs = [model.layers[-1].output]
-    model.layers[-1].outbound_nodes = []
     model.add(Dense(num_classes, activation='softmax'))
 
-    sgd = optimizers.SGD(lr=learing_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return model
 
@@ -150,9 +157,11 @@ print "num of identities: " + str(num_ID)
 
 traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
 
-vgg_model = create_vgg_model(num_ID,SHAPE_INPUT_NN, LEARNING_RATE)
+vgg_model = create_vgg_model(num_ID, SHAPE_INPUT_NN, LEARNING_RATE)
 vgg_model = freeze_layers(vgg_model, NUM_LAYERS_TO_FREEZE)
+print_layers(vgg_model)
 print vgg_model.summary()
+print_train_parameters()
 vgg_model = fine_tune_model(vgg_model, NUM_EPOCHS, BATCH_SIZE, traindata)
 vgg_model.save('/home/jansaldi/Progetto-tesi/models/VGG_Market.h5')
 
