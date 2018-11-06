@@ -16,7 +16,7 @@ NUM_LAYERS_TO_FREEZE = 0
 NUM_EPOCHS = 10
 LEARNING_RATE = 0.001
 SHAPE_INPUT_NN = (224, 224, 3)
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
 
 
@@ -111,12 +111,6 @@ def print_layers(nn_model):
         print str(i) + layer.name
 
 
-def print_train_parameters():
-    print "Learning rate :" + str(LEARNING_RATE)
-    print "num. of epochs: " + str(NUM_EPOCHS)
-    print "freezed layers:" + str(NUM_LAYERS_TO_FREEZE)
-
-
 def freeze_layers(model_to_freeze, num_layers_to_freeze):
     # freeze the weights of first layers
     for layer in model_to_freeze.layers[:num_layers_to_freeze]:
@@ -124,7 +118,7 @@ def freeze_layers(model_to_freeze, num_layers_to_freeze):
     return model_to_freeze
 
 
-def create_vgg_model(num_classes,shape_input_nn, learning_rate):
+def create_vgg_model(num_classes,shape_input_nn):
     # @input: num of classes of the new final softmax layer, num of layers to freeze
     # @output: VGG final model with new softmax layer at the end
 
@@ -136,6 +130,10 @@ def create_vgg_model(num_classes,shape_input_nn, learning_rate):
     model.layers.pop()
     model.add(Dense(num_classes, activation='softmax'))
 
+    return model
+
+
+def compile_model(model, learning_rate):
     sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return model
@@ -143,7 +141,7 @@ def create_vgg_model(num_classes,shape_input_nn, learning_rate):
 
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     # compile the model with SGD and a very slow learning rate
-    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size, verbose=1)
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size, verbose=2)
     return model_to_fine_tune
 
 
@@ -157,11 +155,11 @@ print "num of identities: " + str(num_ID)
 
 traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
 
-vgg_model = create_vgg_model(num_ID, SHAPE_INPUT_NN, LEARNING_RATE)
+vgg_model = create_vgg_model(num_ID, SHAPE_INPUT_NN)
 vgg_model = freeze_layers(vgg_model, NUM_LAYERS_TO_FREEZE)
+vgg_model = compile_model(vgg_model, LEARNING_RATE)
 print_layers(vgg_model)
 print vgg_model.summary()
-print_train_parameters()
 vgg_model = fine_tune_model(vgg_model, NUM_EPOCHS, BATCH_SIZE, traindata)
 vgg_model.save('/home/jansaldi/Progetto-tesi/models/VGG_Market.h5')
 

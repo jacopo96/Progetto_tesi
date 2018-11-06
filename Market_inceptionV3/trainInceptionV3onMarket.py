@@ -112,7 +112,7 @@ def freeze_layers(model_to_freeze, num_layers_to_freeze):
     return model_to_freeze
 
 
-def create_inceptionV3_model(n_classes, shape_input_nn, learning_rate):
+def create_inceptionV3_model(n_classes, shape_input_nn):
     # @input: num of classes of the new final layer and num of layers to freeze
     # @output: InceptionV3 final model with new softmax layer at the end
     base_model = InceptionV3(include_top=False, weights='imagenet', input_shape=shape_input_nn)
@@ -126,14 +126,18 @@ def create_inceptionV3_model(n_classes, shape_input_nn, learning_rate):
       # creating final model
     final_model = Model(base_model.input, x_new_fc)
 
-    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
-    final_model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return final_model
 
 
 def print_layers(nn_model):
     for i, layer in enumerate(nn_model.layers):
         print str(i) + layer.name
+
+
+def compile_model(model, learning_rate):
+    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    return model
 
 
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
@@ -153,9 +157,10 @@ print "num of identities: " + str(num_ID)
 
 traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
 
-inceptionv3 = create_inceptionV3_model(num_ID, SHAPE_INPUT_NN, LEARNING_RATE)
+inceptionv3 = create_inceptionV3_model(num_ID, SHAPE_INPUT_NN)
 #print_layers(inceptionv3)
 freeze_layers(inceptionv3, NUM_LAYERS_TO_FREEZE)
+model = compile_model(inceptionv3, LEARNING_RATE)
 print inceptionv3.summary()
 inceptionv3 = fine_tune_model(inceptionv3, NUM_EPOCHS, BATCH_SIZE, traindata)
 inceptionv3.save('/home/jansaldi/Progetto-tesi/models/inceptionV3_Market.h5')

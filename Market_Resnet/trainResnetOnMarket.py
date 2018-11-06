@@ -146,7 +146,7 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
-def create_resnet_model(num_classes, learning_rate, shape_input_nn):
+def create_resnet_model(num_classes, shape_input_nn):
     # @input: num of classes of the new final softmax layer, num layers to freeze
     # @output: Resnet final model with new softmax layer at the end
 
@@ -196,10 +196,13 @@ def create_resnet_model(num_classes, learning_rate, shape_input_nn):
     #creating the new model
     resnet_model = Model(img_input, x_new_fc)
 
-    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
-    resnet_model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-
     return resnet_model
+
+
+def compile_model(model, learning_rate):
+    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    return model
 
 
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
@@ -222,9 +225,10 @@ print "num of identities: " + str(num_ID)
 # traindata = create_trainData(SHAPE_INPUT_NN, path_traindata, id_int_dictionary, num_ID)
 traindata_with_flippedimages = create_trainData_flippedImages(SHAPE_INPUT_NN, TRAINDATA_PATH, id_int_dictionary, num_ID)
 
-model = create_resnet_model(num_ID, LEARNING_RATE, SHAPE_INPUT_NN)
+model = create_resnet_model(num_ID, SHAPE_INPUT_NN)
 print model.summary()
 model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
+model = compile_model(model, LEARNING_RATE)
 model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata_with_flippedimages)
 model.save('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE)
 

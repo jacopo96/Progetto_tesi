@@ -14,6 +14,8 @@ SHAPE_INPUT_NN = [224, 224, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten_2'
 NAME_MODEL_TO_LOAD = 'Resnet_Duke.h5'
+PATH_QUERY_IMAGES = '/media/data/dataset/Duke_online/query/'
+PATH_GALLERY_IMAGES = '/media/data/dataset/Duke_online/bounding_box_test/'
 
 
 def halfGPU():
@@ -41,42 +43,15 @@ def count_images(path_data):
     return num_imgs
 
 
-def build_idcam_string(id_vector, cam_vector):
-    # @input: vector of id and vector of cam that identify every image
-    # @output: vector of the same dim of the inputs that contains the strings to identify every image in the correct format
-    string_vector = np.empty(id_vector.shape, dtype=np.object_)
-    index = 0
-    for id_num, cam_num in zip(id_vector, cam_vector):
-        substring = "%04d_c%s" % (id_num, cam_num[0])
-        if id_num == -1:
-            substring = "%s_c%s" % (id_num[0], cam_num[0])
-        string_vector[index, :] = substring
-        index += 1
-    return string_vector
-
-
-def find_complete_filename(path_of_images, id_cam_string):
-    # @input: path in which search for the image, string idcam that identifies it
-    # @output: complete filename of the image
-    listing = os.listdir(path_of_images)
-    img_filename = ""
-    for filename in listing:
-        if id_cam_string in filename:
-            img_filename = filename
-            break
-    return img_filename
-
-
 def image_read(img_path):
     image = Image.open(img_path).convert('RGB')
     return image
 
 
-def create_input_to_predict(idcam_string, path_of_images):
+def create_input_to_predict(img_filename, path_of_images):
     # @input: string that identifies the image, path of the directory in which search for it
     # @output : array ready to be predicted
     X_test = np.empty((1, SHAPE_INPUT_NN[0], SHAPE_INPUT_NN[1], SHAPE_INPUT_NN[2]), 'float32')
-    img_filename = find_complete_filename(path_of_images, idcam_string)
     image = image_read(path_of_images + img_filename).resize(SHAPE_INPUT_NN[0:2])
     x = img_to_array(image)
     x = x[:, :, ::-1]
@@ -93,13 +68,15 @@ def print_percentage(index, num_tot_iteration):
     print '%01d' % percentage + '%'
 
 
-def fill_feature_matrix(feature_matrix, string_idcam_vector_, model, path_of_images):
+def fill_feature_matrix(feature_matrix, model, path_of_images):
     index = 0
-    for string in string_idcam_vector_:
-        print_percentage(index, len(string_idcam_vector_))
-        prediction = model.predict(create_input_to_predict(string[0], path_of_images))
-        prediction = prediction.transpose()
-        feature_matrix[:, index] = prediction.squeeze()
+    listing = os.listdir(path_of_images)
+    listing.sort()
+    num_tot_iteration = len(listing)
+    for filename in listing:
+        print_percentage(index, num_tot_iteration)
+        prediction = model.predict(create_input_to_predict(filename, path_of_images))
+        feature_matrix[index, :] = prediction.squeeze()
         index += 1
     return feature_matrix
 
@@ -110,24 +87,13 @@ halfGPU()
 
 model = get_model_for_feature_extraction('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_LOAD, NAME_FEATURE_EXTRACTION_LAYER)
 
-query_id = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryID.mat')
-query_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryCam.mat')
-test_id = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/testID.mat')
-test_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/testCam.mat')
-
-path_query = '/media/data/dataset/Market-1501-v15.09.15/query/'
-path_gallery = '/media/data/dataset/Market-1501-v15.09.15/bounding_box_test/'
-
-string_query_vector = build_idcam_string(query_id['queryID'], query_cam['queryCAM'])
-string_gallery_vector = build_idcam_string(test_id["testID"], test_cam['testCAM'])
-
-prob_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_query)))
-gallery_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_gallery)))
+prob_feature = np.empty((count_images(PATH_QUERY_IMAGES), DIM_OUTPUT_FEATURE_LAYER))
+gallery_feature = np.empty((count_images(PATH_GALLERY_IMAGES),DIM_OUTPUT_FEATURE_LAYER))
 
 print('PROB_FEATURE_FILL:')
-prob_feature = fill_feature_matrix(prob_feature, string_query_vector, model, path_query)
+prob_feature = fill_feature_matrix(prob_feature, model, PATH_QUERY_IMAGES)
 print('GALLERY_FEATURE_FILL:')
-gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, model, path_gallery)
+gallery_feature = fill_feature_matrix(gallery_feature, model, PATH_GALLERY_IMAGES)
 
 
 print " dim gallery_feature: " + str(gallery_feature.shape)

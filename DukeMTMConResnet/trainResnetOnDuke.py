@@ -13,13 +13,13 @@ from keras.applications.resnet50 import conv_block, identity_block
 NUM_OF_CHARACTERS_OF_ID = 4
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
-NUM_LAYERS_TO_FREEZE = 0
-NUM_EPOCHS = 5
+NUM_LAYERS_TO_FREEZE = 173
+NUM_EPOCHS = 10
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
 PATH_TRAIN_DATA = '/media/data/dataset/Duke_online/bounding_box_train/'
-NAME_MODEL_TO_SAVE = 'Resnet_Duke.h5'
+NAME_MODEL_TO_SAVE = 'Resnet_Duke_onlyLastLayersTrained.h5'
 WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/weights/resnet50_tf_weights_imagenet.h5'
 
 
@@ -110,6 +110,11 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
     return X_train, Y_train
 
 
+def print_layers(nn_model):
+    for i, layer in enumerate(nn_model.layers):
+        print str(i) + layer.name
+
+
 def freeze_layers(model, n_layers_to_freeze):
     # freeze the weights of firsts layers
     for layer in model.layers[:n_layers_to_freeze]:
@@ -117,7 +122,7 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
-def create_resnet_model(num_classes, learning_rate):
+def create_resnet_model(num_classes):
     # @input: num of classes of the new final softmax layer, lr
     # @output: Resnet final model with new softmax layer at the end
 
@@ -167,12 +172,13 @@ def create_resnet_model(num_classes, learning_rate):
     #creating the new model
     resnet_model = Model(img_input, x_new_fc)
 
-    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
-    resnet_model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-
-    print resnet_model.summary()
     return resnet_model
 
+
+def compile_model(model, learning_rate):
+    sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    return model
 
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     # compile the model with SGD and a very slow learning rate
@@ -190,8 +196,11 @@ print "num of identities: " + str(num_ID)
 
 
 traindata = create_trainData(SHAPE_INPUT_NN, PATH_TRAIN_DATA, id_int_dictionary, num_ID)
-model = create_resnet_model(num_ID, LEARNING_RATE)
+model = create_resnet_model(num_ID)
+print_layers(model)
 model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
+model = compile_model(model, LEARNING_RATE)
+print model.summary()
 model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata)
 model.save('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE)
 
