@@ -1,9 +1,10 @@
+from PIL import Image
+
 from keras.backend import set_session
 from keras.models import load_model
 from keras.preprocessing.image import img_to_array
 from keras.models import Model
 import tensorflow as tf
-import cv2
 import numpy as np
 import scipy.io as sio
 import os
@@ -12,6 +13,10 @@ GPU_FRACTION = 0.5
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [224, 224, 3]
 DIM_OUTPUT_FEATURE_LAYER = 4096
+NAME_FEATURE_EXTRACTION_LAYER = 'fc2'
+NAME_MODEL_TO_LOAD = 'VGG_Market_config3.20.h5'
+PATH_IN_WHICH_SAVE_GALLERY_FEATURE = '/home/jansaldi/Progetto-tesi/Market_VGG/features/gallery_feature_config3.20.mat'
+PATH_IN_WHICH_SAVE_PROB_FEATURE = '/home/jansaldi/Progetto-tesi/Market_VGG/features/prob_feature_config3.20.mat'
 
 
 def halfGPU():
@@ -39,7 +44,7 @@ def count_images(path_data):
     return num_imgs
 
 
-def build_idcam_string(id_vector, cam_vector):
+def build_idcam_string_vector(id_vector, cam_vector):
     # @input: vector of id and vector of cam that identify every image
     # @output: vector of the same dim of the inputs that contains the strings to identify every image in the correct format
     string_vector = np.empty(id_vector.shape, dtype=np.object_)
@@ -65,12 +70,17 @@ def find_complete_filename(path_of_images, id_cam_string):
     return img_filename
 
 
+def image_read(img_path):
+    image = Image.open(img_path).convert('RGB')
+    return image
+
+
 def create_input_to_predict(idcam_string, path_of_images):
     # @input: string that identifies the image, path of the directory in which search for it
     # @output : array ready to be predicted
     X_test = np.empty((1, SHAPE_INPUT_NN[0], SHAPE_INPUT_NN[1], SHAPE_INPUT_NN[2]), 'float32')
     img_filename = find_complete_filename(path_of_images, idcam_string)
-    image = cv2.resize(cv2.imread(path_of_images + img_filename), (SHAPE_INPUT_NN[0], SHAPE_INPUT_NN[1])).astype(np.float32)
+    image = image_read(path_of_images + img_filename).resize(SHAPE_INPUT_NN[0:2])
     x = img_to_array(image)
     x = x[:, :, ::-1]
     x[:, :, 0] -= NORMALIZING_COSTANTS[0]
@@ -80,50 +90,27 @@ def create_input_to_predict(idcam_string, path_of_images):
     return X_test
 
 
+def print_percentage(index, num_tot_iteration):
+    index = index * 1.0
+    percentage = (index / num_tot_iteration) * 100.0
+    print '{0:.2f}%'.format(percentage)
+
+
 def fill_feature_matrix(feature_matrix, string_idcam_vector_, model, path_of_images):
     index = 0
     for string in string_idcam_vector_:
-        print str(index/len(string_idcam_vector_)*100) + '%'
+        print_percentage(index, len(string_idcam_vector_))
         prediction = model.predict(create_input_to_predict(string[0], path_of_images))
         prediction = prediction.transpose()
         feature_matrix[:, index] = prediction.squeeze()
         index += 1
     return feature_matrix
 
-
-def normalize(feature_vector):
-    # @input: vector to be normalized
-    # @output: normalized vector
-    sum_val = np.sqrt(sum(np.square(feature_vector)))
-    # check if sum is on columns
-    for i in range(len(feature_vector[:, 0])):   #DA 0 A 4096
-        feature_vector[i, :] = feature_vector[i, :] / sum_val
-    return feature_vector
-
-
-def my_pdist(vectorA, vectorB):
-    # @input: 2 matrixes nxd and mxd
-    # #output: euclidean distance of 2 matrixes point to point nxm
-    squared_A = np.square(vectorA)
-    squared_B = np.square(vectorB)
-    row_sum_A = np.sum(squared_A, axis=1)
-    row_sum_B = np.sum(squared_B, axis=1)
-
-    # code to make them row and column vectors
-    row_sum_A = row_sum_A[:, np.newaxis]
-    row_sum_B = row_sum_B[np.newaxis, :]
-
-    double_product = 2 * np.dot(vectorA, np.transpose(vectorB))
-
-    eucliden_distance = np.sqrt(row_sum_A + row_sum_B - double_product)
-    return eucliden_distance
-
-
 #test trained networks on test data
 
 halfGPU()
 
-model_VGG = get_model_for_feature_extraction('/home/jansaldi/Progetto-tesi/models/VGG_Market.h5', 'dense_2')
+model = get_model_for_feature_extraction('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_LOAD, NAME_FEATURE_EXTRACTION_LAYER)
 
 query_id = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryID.mat')
 query_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/queryCam.mat')
@@ -133,29 +120,23 @@ test_cam = sio.loadmat('/home/jansaldi/Progetto-tesi/utils/Market/testCam.mat')
 path_query = '/media/data/dataset/Market-1501-v15.09.15/query/'
 path_gallery = '/media/data/dataset/Market-1501-v15.09.15/bounding_box_test/'
 
-string_query_vector = build_idcam_string(query_id['queryID'], query_cam['queryCAM'])
-string_gallery_vector = build_idcam_string(test_id["testID"], test_cam['testCAM'])
+string_query_vector = build_idcam_string_vector(query_id['queryID'], query_cam['queryCAM'])
+string_gallery_vector = build_idcam_string_vector(test_id["testID"], test_cam['testCAM'])
 
 prob_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_query)))
 gallery_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_gallery)))
 
 print('PROB_FEATURE_FILL:')
-prob_feature = fill_feature_matrix(prob_feature, string_query_vector, model_VGG, path_query)
+prob_feature = fill_feature_matrix(prob_feature, string_query_vector, model, path_query)
 print('GALLERY_FEATURE_FILL:')
-gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, model_VGG, path_gallery)
+gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, model, path_gallery)
 
 
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_VGG/features/gallery_feature.mat', mdict={'gal': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_VGG/features/prob_feature.mat', mdict={'prob': prob_feature})
-
-#gallery_feature = normalize(gallery_feature)
-#probability_feature = normalize(prob_feature)
-
-#euclidean_distance = my_pdist(gallery_feature.transpose(), prob_feature.transpose())
-#print euclidean_distance.shape
+sio.savemat(PATH_IN_WHICH_SAVE_GALLERY_FEATURE, mdict={'gal': gallery_feature})
+sio.savemat(PATH_IN_WHICH_SAVE_PROB_FEATURE, mdict={'prob': prob_feature})
 
 
 

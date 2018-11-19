@@ -1,28 +1,27 @@
 import keras
-from PIL import Image
-from keras import optimizers, Input, Model
+from keras import optimizers, Model
+from keras.applications import InceptionV3
 from keras.callbacks import ModelCheckpoint
-from keras.layers import ZeroPadding2D, Conv2D, BatchNormalization, Activation, MaxPooling2D, AveragePooling2D, Flatten, \
-    Dense
+from keras.models import load_model
 from keras.preprocessing.image import img_to_array
+from keras.layers import Dense, AveragePooling2D, Flatten
+from PIL import Image
 import os
 import numpy as np
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-from keras.applications.resnet50 import conv_block, identity_block
-import matplotlib.pyplot as plt
-
 NUM_OF_CHARACTERS_OF_ID = 4
-NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
-NUM_LAYERS_TO_FREEZE = 0
-NUM_EPOCHS = 30
-LEARNING_RATE = 1e-3
-SHAPE_INPUT_NN = (224, 224, 3)
+NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
+NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED = 310
+NUM_EPOCHS_ONLY_LAST_TRAIN = 30
+NUM_EPOCHS_ENTINE_NETWORK_TRAINED = 20
+LEARNING_RATE_ENTINE_NETWORK = 1e-3
+LEARNING_RATE_LAST_LAYERS = 1e-2
+SHAPE_INPUT_NN = [299, 299, 3]
 BATCH_SIZE = 16
-PATH_TRAIN_DATA = '/media/data/dataset/Duke_online/bounding_box_train/'
-NAME_MODEL_TO_SAVE = 'Resnet_Duke_config3'
-WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/weights/resnet50_tf_weights_imagenet.h5'
+TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
+NAME_MODEL_TO_SAVE = 'inceptionV3_Market_config4'
 
 
 def halfGPU():
@@ -31,11 +30,11 @@ def halfGPU():
     set_session(tf.Session(config=config))
 
 
-def create_id_int_dict(path):
-    # @input : path of duke train directory
+def count_id(path):
+    # @input : path of Market
     # @output : dictionary of ID-integers to build keras input labels
     listing = os.listdir(path)
-    #dictionary for conversion from ID to continuous mapping output (key :ID, integer from 0 to 701)
+    #dictionary = dictionary for conversion from ID to continuous mapping output (key :ID to integer from 0 to 750)
     id_int_dictionary = {}
     index = 0
     for filename in listing:
@@ -73,7 +72,6 @@ def image_read(img_path):
 
 
 def prepare_x_train(image):
-    # preprocess img sistemare paremetri traindata
     x = img_to_array(image)
     x = x[:, :, ::-1]
     x[:, :, 0] -= NORMALIZING_COSTANTS[0]
@@ -90,7 +88,7 @@ def prepare_y_train(id_int_dictionary, filename, num_id):
 
 
 def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
-    # @input : size of images, path of training images,dict and num of id
+    # @input : size of images, path of training images
     # @output : X_train and Y_train
     listing = os.listdir(path_train)
     num_imgs = count_images(path_train)
@@ -102,7 +100,6 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
             # create x_train
             image = image_read(path_train + filename).resize(shape_input_nn[0:2])
             X_train[index, :, :, :] = prepare_x_train(image)
-
             # create Y_train
             Y_train[index, :] = prepare_y_train(id_int_dict, filename, num_id)
             index += 1
@@ -110,10 +107,6 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
     print "dimensione x_train: " + str(X_train.shape)
     print "dimensione y_train: " + str(Y_train.shape)
     return X_train, Y_train
-
-
-def flip_image_horizontally(image):
-    return np.flip(image, 1)
 
 
 def create_trainData_flippedImages(shape_input_nn, path_train, id_int_dict, num_id):
@@ -136,7 +129,7 @@ def create_trainData_flippedImages(shape_input_nn, path_train, id_int_dict, num_
             index += 1
 
             #create x_train flipped image
-            flipped_image = flip_image_horizontally(image)
+            flipped_image = np.flip(image, 1)
             X_train[index, :, :, :] = prepare_x_train(flipped_image)
             Y_train[index, :] = y
             index += 1
@@ -146,112 +139,82 @@ def create_trainData_flippedImages(shape_input_nn, path_train, id_int_dict, num_
     return X_train, Y_train
 
 
+def freeze_layers(model_to_freeze, num_layers_to_freeze):
+    # freeze the weights of first layers
+    for layer in model_to_freeze.layers[:num_layers_to_freeze]:
+        layer.trainable = False
+    return model_to_freeze
+
+
+def unfreeze_layers(model):
+    for layer in model.layers:
+        layer.trainable = True
+    return model
+
+
+def create_inceptionV3_model(n_classes, shape_input_nn):
+    # @input: num of classes of the new final layer and shape of the input images
+    # @output: InceptionV3 final model with new softmax layer at the end
+    base_model = InceptionV3(include_top=False, weights='imagenet', input_shape=shape_input_nn)
+
+    # Fully Connected Softmax Layer
+    x = base_model.output
+    x_new_fc = AveragePooling2D((8, 8), strides=(8, 8), name='avg_pool')(x)
+    x_new_fc = Flatten(name='flatten')(x_new_fc)
+    x_new_fc = Dense(n_classes, activation='softmax', name='predictions')(x_new_fc)
+
+      # creating final model
+    final_model = Model(base_model.input, x_new_fc)
+
+    return final_model
+
+
 def print_layers(nn_model):
+    # print every layer with an index num
     for i, layer in enumerate(nn_model.layers):
         print str(i) + layer.name
 
 
-def freeze_layers(model, n_layers_to_freeze):
-    # freeze the weights of firsts layers
-    for layer in model.layers[:n_layers_to_freeze]:
-        layer.trainable = False
-    return model
-
-
-def create_resnet_model(num_classes):
-    # @input: num of classes of the new final softmax layer, lr
-    # @output: Resnet final model with new softmax layer at the end
-
-    #creating Resnet network
-    img_input = Input(shape=SHAPE_INPUT_NN)
-    bn_axis = 3
-    x = ZeroPadding2D(padding=(3, 3), name='conv1_pad')(img_input)
-    x = Conv2D(64, (7, 7), strides=(2, 2), padding='valid', name='conv1')(x)
-    x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((3, 3), strides=(2, 2))(x)
-
-    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
-
-    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
-
-    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
-
-    x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c')
-
-    x_fc = AveragePooling2D((7, 7), name='avg_pool')(x)
-    x_fc = Flatten()(x_fc)
-    x_fc = Dense(1000, activation='softmax', name='fcnew')(x_fc)
-
-    resnet_model = Model(img_input, x_fc)
-
-    # load weights
-    resnet_model.load_weights(WEIGHTS_PATH)
-
-    #creating new last softmax layer
-    x_new_fc = AveragePooling2D((7, 7), name='avg_pool')(x)
-    x_new_fc = Flatten()(x_new_fc)
-    x_new_fc = Dense(num_classes, activation='softmax', name='fcnew')(x_new_fc)
-
-    #creating the new model
-    resnet_model = Model(img_input, x_new_fc)
-
-    return resnet_model
-
-
 def compile_model(model, learning_rate):
+    # compile the model with the given lr and sgd
     sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     return model
 
 
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
+    # fit the model with the traindata
     save_checkpoint = ModelCheckpoint(
         filepath='/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".{epoch:02d}.h5",
         monitor='val_loss', verbose=0, save_best_only=False,
         save_weights_only=False, period=5)
-    history = model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
-                                     callbacks=[save_checkpoint])
-    return history
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size,
+                           verbose=2, callbacks=[save_checkpoint])
 
 
-def plot_train_loss(history):
-    plt.plot(history.history['loss'])
-    plt.title('model train loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.savefig('/home/jansaldi/Progetto-tesi/DukeMTMC_Resnet/config3.jpg', dpi=500)
-    plt.show()
-
+def fine_tune_model_only_last(model_to_fine_tune, nb_epoch, batch_size, traindata):
+    # fit the model with the traindata
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size,
+                           verbose=2)
+    return model_to_fine_tune
 
 halfGPU()
 
-# path of market
-id_int_dictionary = create_id_int_dict(PATH_TRAIN_DATA)
+dictionary = count_id(TRAINDATA_PATH)
 
-num_ID = len(id_int_dictionary)
+num_ID = len(dictionary)
 print "num of identities: " + str(num_ID)
 
-
-traindata = create_trainData_flippedImages(SHAPE_INPUT_NN, PATH_TRAIN_DATA, id_int_dictionary, num_ID)
-model = create_resnet_model(num_ID)
-print_layers(model)
-model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
-model = compile_model(model, LEARNING_RATE)
-print model.summary()
-loss_history = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata)
-plot_train_loss(loss_history)
-
-
+traindata = create_trainData_flippedImages(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
+inceptionv3 = create_inceptionV3_model(num_ID, SHAPE_INPUT_NN)
+print_layers(inceptionv3)
+freeze_layers(inceptionv3, NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED)
+model = compile_model(inceptionv3, LEARNING_RATE_LAST_LAYERS)
+print inceptionv3.summary()
+inceptionv3 = fine_tune_model_only_last(inceptionv3, NUM_EPOCHS_ONLY_LAST_TRAIN, BATCH_SIZE, traindata)
+model.save('/home/jansaldi/Progetto-tesi/models/temporary_config4.h5')
+final_model = load_model('/home/jansaldi/Progetto-tesi/models/temporary_config4.h5')
+final_model = unfreeze_layers(final_model)
+final_model = compile_model(final_model, LEARNING_RATE_ENTINE_NETWORK)
+print final_model.summary()
+fine_tune_model(final_model, NUM_EPOCHS_ENTINE_NETWORK_TRAINED, BATCH_SIZE, traindata)

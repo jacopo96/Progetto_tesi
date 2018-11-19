@@ -13,7 +13,7 @@ NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [224, 224, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten_2'
-NAME_MODEL_TO_LOAD = 'Resnet_Market_flipped_imgs.h5'
+NAME_MODEL_TO_LOAD = 'Resnet_Market_config4.30.h5'
 
 
 def halfGPU():
@@ -123,7 +123,7 @@ string_gallery_vector = build_idcam_string(test_id["testID"], test_cam['testCAM'
 
 prob_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_query)))
 gallery_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, count_images(path_gallery)))
-
+print ('NAME MODEL: ' + NAME_MODEL_TO_LOAD)
 print('PROB_FEATURE_FILL:')
 prob_feature = fill_feature_matrix(prob_feature, string_query_vector, model, path_query)
 print('GALLERY_FEATURE_FILL:')
@@ -133,8 +133,8 @@ gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, mo
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature_flipped_imgs.mat', mdict={'gal': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature_flipped_imgs.mat', mdict={'prob': prob_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature_config4.30.mat', mdict={'galFea': gallery_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature_config4.30.mat', mdict={'probFea': prob_feature})
 
 
 

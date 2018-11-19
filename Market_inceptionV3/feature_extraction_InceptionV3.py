@@ -13,9 +13,9 @@ NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [299, 299, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten'
-NAME_MODEL_TO_LOAD = 'inceptionV3_Market.h5'
-PATH_IN_WHICH_SAVE_GALLERY_FEATURE = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/gallery_feature.mat'
-PATH_IN_WHICH_SAVE_PROB_FEATURE = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/prob_feature.mat'
+NAME_MODEL_TO_LOAD = 'inceptionV3_Market_config1.200.h5'
+PATH_IN_WHICH_SAVE_GALLERY_FEATURE = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/gallery_feature_config1.200.mat'
+PATH_IN_WHICH_SAVE_PROB_FEATURE = '/home/jansaldi/Progetto-tesi/Market_inceptionV3/features/prob_feature_config1.200.mat'
 
 
 def halfGPU():

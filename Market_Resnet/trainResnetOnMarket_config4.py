@@ -10,18 +10,23 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 from keras.applications.resnet50 import conv_block, identity_block
 from keras.callbacks import ModelCheckpoint
+from keras.models import load_model
+import matplotlib.pyplot as plt
 
 NUM_OF_CHARACTERS_OF_ID = 4
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
-NUM_LAYERS_TO_FREEZE = 0
-NUM_EPOCHS = 20
-LEARNING_RATE = 1e-3
+NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED = 173
+INDEX_LAST_LAYER = 176
+NUM_EPOCHS_ONLY_LAST_TRAIN = 100
+NUM_EPOCHS_ENTINE_NETWORK_TRAINED = 50
+LEARNING_RATE_ENTINE_NETWORK = 1e-4
+LEARNING_RATE_LAST_LAYERS = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
 TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
 WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/weights/resnet50_tf_weights_imagenet.h5'
-NAME_MODEL_TO_SAVE = 'Resnet_Market_config3'
+NAME_MODEL_TO_SAVE = 'Resnet_Market_config4'
 
 
 def halfGPU():
@@ -152,6 +157,18 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
+def freeze_last_layer(model):
+    for layer in model.layers[NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED:]:
+        layer.trainable = False
+    return model
+
+
+def unfreeze_convolutional_layers(model):
+    for layer in model.layers[:NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED]:
+        layer.trainable = True
+    return model
+
+
 def create_resnet_model(num_classes, shape_input_nn):
     # @input: num of classes of the new final softmax layer, num layers to freeze
     # @output: Resnet final model with new softmax layer at the end
@@ -205,6 +222,12 @@ def create_resnet_model(num_classes, shape_input_nn):
     return resnet_model
 
 
+def print_layers(nn_model):
+    # print every layer with an index num
+    for i, layer in enumerate(nn_model.layers):
+        print str(i) + layer.name
+
+
 def compile_model(model, learning_rate):
     sgd = optimizers.SGD(lr=learning_rate, momentum=0.9, decay=1e-6, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
@@ -214,9 +237,23 @@ def compile_model(model, learning_rate):
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     save_checkpoint = ModelCheckpoint(filepath='/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".{epoch:02d}.h5",
                                       monitor='val_loss', verbose=0, save_best_only=False,
-                                      save_weights_only=False, period=2)
-    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
-                           callbacks=[save_checkpoint])
+                                      save_weights_only=False, period=10)
+    history = model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
+                                     callbacks=[save_checkpoint])
+    return history
+
+
+def plot_train_loss(history):
+    plt.plot(history.history['loss'])
+    plt.title('model train loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.savefig('/home/jansaldi/Progetto-tesi/Market_Resnet/config4.jpg', dpi=500)
+    plt.show()
+
+
+def fine_tune_model_only_last(model_to_fine_tune, nb_epoch, batch_size, traindata):
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2)
     return model_to_fine_tune
 
 
@@ -236,10 +273,15 @@ print "num of identities: " + str(num_ID)
 traindata_with_flippedimages = create_trainData_flippedImages(SHAPE_INPUT_NN, TRAINDATA_PATH, id_int_dictionary, num_ID)
 
 model = create_resnet_model(num_ID, SHAPE_INPUT_NN)
-model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
-model = compile_model(model, LEARNING_RATE)
+model = freeze_layers(model, NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED)
+model = compile_model(model, LEARNING_RATE_LAST_LAYERS)
 print model.summary()
-model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata_with_flippedimages)
-#model.save('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".h5")
-
-
+model = fine_tune_model_only_last(model, NUM_EPOCHS_ONLY_LAST_TRAIN, BATCH_SIZE, traindata_with_flippedimages)
+model.save('/home/jansaldi/Progetto-tesi/models/temporary_config4.h5')
+final_model = load_model('/home/jansaldi/Progetto-tesi/models/temporary_config4.h5')
+final_model = unfreeze_convolutional_layers(final_model)
+final_model = freeze_last_layer(final_model)
+final_model = compile_model(final_model, LEARNING_RATE_ENTINE_NETWORK)
+print final_model.summary()
+train_loss_history = fine_tune_model(final_model, NUM_EPOCHS_ENTINE_NETWORK_TRAINED, BATCH_SIZE, traindata_with_flippedimages)
+plot_train_loss(train_loss_history)

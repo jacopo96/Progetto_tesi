@@ -11,11 +11,13 @@ import os
 GPU_FRACTION = 0.5
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [224, 224, 3]
-DIM_OUTPUT_FEATURE_LAYER = 2048
-NAME_FEATURE_EXTRACTION_LAYER = 'flatten_2'
-NAME_MODEL_TO_LOAD = 'Resnet_Duke_onlyLastLayersTrained.h5'
+DIM_OUTPUT_FEATURE_LAYER = 4096
+NAME_FEATURE_EXTRACTION_LAYER = 'fc2'
+NAME_MODEL_TO_LOAD = 'VGG_Duke_config2.20.h5'
 PATH_QUERY_IMAGES = '/media/data/dataset/Duke_online/query/'
 PATH_GALLERY_IMAGES = '/media/data/dataset/Duke_online/bounding_box_test/'
+PATH_IN_WHICH_SAVE_GALLERY_FEATURES = '/home/jansaldi/Progetto-tesi/DukeMTMC_VGG/features/gallery_feature_config2.20.mat'
+PATH_IN_WHICH_SAVE_PROB_FEATURES = '/home/jansaldi/Progetto-tesi/DukeMTMC_VGG/features/prob_feature_config2.20.mat'
 
 
 def halfGPU():
@@ -99,16 +101,5 @@ gallery_feature = fill_feature_matrix(gallery_feature, model, PATH_GALLERY_IMAGE
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/DukeMTMC_Resnet/features/gallery_feature_onlyLast.mat', mdict={'gal': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/DukeMTMC_Resnet/features/prob_feature_onlyLast.mat', mdict={'prob': prob_feature})
-
-
-
-
-
-
-
-
-
-
-
+sio.savemat(PATH_IN_WHICH_SAVE_GALLERY_FEATURES, mdict={'gal': gallery_feature})
+sio.savemat(PATH_IN_WHICH_SAVE_PROB_FEATURES, mdict={'prob': prob_feature})

@@ -1,28 +1,27 @@
 import keras
 from PIL import Image
-from keras import optimizers, Input, Model
+from keras import optimizers, Sequential
+from keras.applications import VGG16
 from keras.callbacks import ModelCheckpoint
-from keras.layers import ZeroPadding2D, Conv2D, BatchNormalization, Activation, MaxPooling2D, AveragePooling2D, Flatten, \
-    Dense
+from keras.layers import Dense
 from keras.preprocessing.image import img_to_array
 import os
 import numpy as np
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-from keras.applications.resnet50 import conv_block, identity_block
 import matplotlib.pyplot as plt
+
 
 NUM_OF_CHARACTERS_OF_ID = 4
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
 NUM_LAYERS_TO_FREEZE = 0
-NUM_EPOCHS = 30
+NUM_EPOCHS = 20
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
 BATCH_SIZE = 16
 PATH_TRAIN_DATA = '/media/data/dataset/Duke_online/bounding_box_train/'
-NAME_MODEL_TO_SAVE = 'Resnet_Duke_config3'
-WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/weights/resnet50_tf_weights_imagenet.h5'
+NAME_MODEL_TO_SAVE = 'VGG_Duke_config3'
 
 
 def halfGPU():
@@ -158,57 +157,26 @@ def freeze_layers(model, n_layers_to_freeze):
     return model
 
 
-def create_resnet_model(num_classes):
-    # @input: num of classes of the new final softmax layer, lr
-    # @output: Resnet final model with new softmax layer at the end
+def create_vgg_model(num_classes, shape_input_nn):
+    # @input: num of classes of the new final softmax layer, num of layers to freeze
+    # @output: VGG final model with new softmax layer at the end
 
-    #creating Resnet network
-    img_input = Input(shape=SHAPE_INPUT_NN)
-    bn_axis = 3
-    x = ZeroPadding2D(padding=(3, 3), name='conv1_pad')(img_input)
-    x = Conv2D(64, (7, 7), strides=(2, 2), padding='valid', name='conv1')(x)
-    x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
-    x = Activation('relu')(x)
-    x = MaxPooling2D((3, 3), strides=(2, 2))(x)
+    # i use a sequential model because the VGG16 keras model doesn't have an "add" method to add new layers
+    vgg_model = VGG16(include_top=True, weights='imagenet', input_shape=shape_input_nn)
+    model = Sequential()
+    for layer in vgg_model.layers[:-1]:
+        model.add(layer)
 
-    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
+    # don't use model.pop cause when you pop a layer directly from the list model.layers,
+    #  the topology of this model is not updated accordingly.
+    #  So all following operations would be wrong, given a wrong model definition.
+    #  As a result, the next added layer will be called with a wrong input tensor
+    # to solve the problem i don't add the last layer to the sequential model
+    # so i don't have to pop it after
+    model.add(Dense(num_classes, activation='softmax'))
 
-    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
+    return model
 
-    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
-
-    x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c')
-
-    x_fc = AveragePooling2D((7, 7), name='avg_pool')(x)
-    x_fc = Flatten()(x_fc)
-    x_fc = Dense(1000, activation='softmax', name='fcnew')(x_fc)
-
-    resnet_model = Model(img_input, x_fc)
-
-    # load weights
-    resnet_model.load_weights(WEIGHTS_PATH)
-
-    #creating new last softmax layer
-    x_new_fc = AveragePooling2D((7, 7), name='avg_pool')(x)
-    x_new_fc = Flatten()(x_new_fc)
-    x_new_fc = Dense(num_classes, activation='softmax', name='fcnew')(x_new_fc)
-
-    #creating the new model
-    resnet_model = Model(img_input, x_new_fc)
-
-    return resnet_model
 
 
 def compile_model(model, learning_rate):
@@ -221,7 +189,7 @@ def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     save_checkpoint = ModelCheckpoint(
         filepath='/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".{epoch:02d}.h5",
         monitor='val_loss', verbose=0, save_best_only=False,
-        save_weights_only=False, period=5)
+        save_weights_only=False, period=20)
     history = model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
                                      callbacks=[save_checkpoint])
     return history
@@ -232,7 +200,7 @@ def plot_train_loss(history):
     plt.title('model train loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
-    plt.savefig('/home/jansaldi/Progetto-tesi/DukeMTMC_Resnet/config3.jpg', dpi=500)
+    plt.savefig('/home/jansaldi/Progetto-tesi/DukeMTMC_VGG/config1.jpg', dpi=500)
     plt.show()
 
 
@@ -246,12 +214,13 @@ print "num of identities: " + str(num_ID)
 
 
 traindata = create_trainData_flippedImages(SHAPE_INPUT_NN, PATH_TRAIN_DATA, id_int_dictionary, num_ID)
-model = create_resnet_model(num_ID)
+model = create_vgg_model(num_ID, SHAPE_INPUT_NN)
 print_layers(model)
 model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
 model = compile_model(model, LEARNING_RATE)
 print model.summary()
 loss_history = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata)
 plot_train_loss(loss_history)
+
 
 
