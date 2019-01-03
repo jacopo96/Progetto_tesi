@@ -104,6 +104,7 @@ def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
             # create Y_train
             Y_train[index, :] = prepare_y_train(id_int_dict, filename, num_id)
             index += 1
+            print str(index)
 
     print "dimensione x_train: " + str(X_train.shape)
     print "dimensione y_train: " + str(Y_train.shape)
@@ -211,7 +212,7 @@ dictionary = count_id(TRAINDATA_PATH)
 num_ID = len(dictionary)
 print "num of identities: " + str(num_ID)
 
-traindata = create_trainData_flippedImages(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
+traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, dictionary, num_ID)
 
 vgg_model = create_vgg_model(num_ID, SHAPE_INPUT_NN)
 vgg_model = freeze_layers(vgg_model, NUM_LAYERS_TO_FREEZE)

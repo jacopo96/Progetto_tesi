@@ -4,24 +4,26 @@ from keras import optimizers, Input, Model
 from keras.layers import ZeroPadding2D, Conv2D, BatchNormalization, Activation, MaxPooling2D, AveragePooling2D, Flatten, \
     Dense
 from keras.preprocessing.image import img_to_array
-import os
 import numpy as np
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 from keras.applications.resnet50 import conv_block, identity_block
 from keras.callbacks import ModelCheckpoint
+import scipy.ndimage as sci
 
 NUM_OF_CHARACTERS_OF_ID = 4
+NUM_OF_ID_TRAIN = 1041
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
 NUM_LAYERS_TO_FREEZE = 0
 NUM_EPOCHS = 20
 LEARNING_RATE = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
-BATCH_SIZE = 32
-TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
+BATCH_SIZE = 16
+PATH_LIST_OF_TRAINFILES = '/media/data/dataset/MSMT17_V1/list_train.txt'
+TRAINDATA_PATH = '/media/data/dataset/MSMT17_V1/train/'
 WEIGHTS_PATH = '/home/jansaldi/Progetto-tesi/weights/resnet50_tf_weights_imagenet.h5'
-NAME_MODEL_TO_SAVE = 'Resnet_Market_config3'
+NAME_MODEL_TO_SAVE = 'Resnet_MSMT_config3'
 
 
 def halfGPU():
@@ -30,40 +32,20 @@ def halfGPU():
     set_session(tf.Session(config=config))
 
 
-def count_id(path):
-    # @input : path of Market train data
-    # @output : dictionary of ID-integers to build keras input labels
-    listing = os.listdir(path)
-    #dictionary = dictionary for conversion from ID to continuous mapping output (key :ID, integer from 0 to 750)
-    id_int_dictionary = {}
-    index = 0
-    for filename in listing:
-        if filename.endswith('.jpg'):
-            # ID indice ID immagine
-            ID = filename[:NUM_OF_CHARACTERS_OF_ID]
-            if index == 0:
-                id_int_dictionary[ID] = index
-                index += 1
-            else:
-                is_not_already_listed = True
-                for keys in id_int_dictionary:
-                    if keys == ID:
-                        is_not_already_listed = False
-                if is_not_already_listed:
-                    id_int_dictionary[ID] = index
-                    index += 1
-    return id_int_dictionary
-
-
-def count_images(path_traindata):
+def count_images(trainlist_file):
     # @input : path of train images
     # @output : num of images in the directory
-    listing = os.listdir(path_traindata)
     num_imgs = 0
-    for filename in listing:
-        if filename.endswith(".jpg"):
-            num_imgs += 1
+    for line in trainlist_file:
+        num_imgs +=1
     return num_imgs
+
+
+def read_line(line_of_file):
+    splitted_line = line_of_file.split()
+    id = splitted_line[1]
+    img_path = splitted_line[0]
+    return id, img_path
 
 
 def image_read(img_path):
@@ -72,7 +54,6 @@ def image_read(img_path):
 
 
 def prepare_x_train(image):
-    # preprocess img sistemare paremetri traindata
     x = img_to_array(image)
     x = x[:, :, ::-1]
     x[:, :, 0] -= NORMALIZING_COSTANTS[0]
@@ -81,65 +62,65 @@ def prepare_x_train(image):
     return x
 
 
-def prepare_y_train(id_int_dictionary, filename, num_id):
-    ID = filename[:NUM_OF_CHARACTERS_OF_ID]
-    y = id_int_dictionary[ID]
-    y = keras.utils.to_categorical(y, num_id)
+def prepare_y_train(id, num_id):
+    y = keras.utils.to_categorical(id, num_id)
     return y
 
 
-def flip_image_horizontally(image):
-    return np.flip(image, 1)
-
-
-def create_trainData_data_augmentation(shape_input_nn, path_train, id_int_dict, num_id):
-    # @input : size of images, path of training images, dict and num of id
+def create_trainData(shape_input_nn, trainlist_file, num_imgs, num_id):
+    # @input : size of images, path of training images,dict and num of id
     # @output : X_train and Y_train
-    listing = os.listdir(path_train)
-    num_imgs = count_images(path_train)
-    X_train = np.empty((4*num_imgs, shape_input_nn[0], shape_input_nn[1], shape_input_nn[2]), 'float32')
-    Y_train = np.empty((4*num_imgs, num_id), 'float32')
+    X_train = np.empty((num_imgs, shape_input_nn[0], shape_input_nn[1], shape_input_nn[2]), 'float32')
+    Y_train = np.empty((num_imgs, num_id), 'float32')
     index = 0
-    for filename in listing:
-        if filename.endswith(".jpg"):
-            # create x_train image
-            image = image_read(path_train + filename).resize(shape_input_nn[0:2])
-            X_train[index, :, :, :] = prepare_x_train(image)
+    for fileline in trainlist_file:
+        [identity, img_path] = read_line(fileline)
 
-            # create Y_train
-            y_label = prepare_y_train(id_int_dict, filename, num_id)
-            Y_train[index, :] = y_label
-            index += 1
+         # create x_train
+        image = image_read(TRAINDATA_PATH + img_path).resize(shape_input_nn[0:2])
+        X_train[index, :, :, :] = prepare_x_train(image)
 
-            flipped_image = flip_image_horizontally(image)
-            X_train[index, :, :, :] = prepare_x_train(flipped_image)
-            Y_train[index, :] = y_label
-            index += 1
-            print str(index)
+        # create Y_train
+        Y_train[index, :] = prepare_y_train(int(identity), num_id)
+        index += 1
 
     print "dimensione x_train: " + str(X_train.shape)
     print "dimensione y_train: " + str(Y_train.shape)
     return X_train, Y_train
 
 
-def create_trainData(shape_input_nn, path_train, id_int_dict, num_id):
+def flip_image_horizontally(image):
+    return np.flip(image, 1)
+
+
+def create_trainData_data_augmentation(shape_input_nn, trainlist_file, num_imgs, num_id):
     # @input : size of images, path of training images,dict and num of id
     # @output : X_train and Y_train
-    listing = os.listdir(path_train)
-    num_imgs = count_images(path_train)
-    X_train = np.empty((num_imgs, shape_input_nn[0], shape_input_nn[1], shape_input_nn[2]), 'float32')
-    Y_train = np.empty((num_imgs, num_id), 'float32')
+    X_train = np.empty((3*num_imgs, shape_input_nn[0], shape_input_nn[1], shape_input_nn[2]), 'float32')
+    Y_train = np.empty((3*num_imgs, num_id), 'float32')
     index = 0
-    for filename in listing:
-        if filename.endswith(".jpg"):
-            # create x_train
-            image = image_read(path_train + filename).resize(shape_input_nn[0:2])
-            X_train[index, :, :, :] = prepare_x_train(image)
+    for fileline in trainlist_file:
+        [identity, img_path] = read_line(fileline)
 
-            # create Y_train
-            Y_train[index, :] = prepare_y_train(id_int_dict, filename, num_id)
-            index += 1
-            print str(index)
+         # create x_train
+        image = image_read(TRAINDATA_PATH + img_path).resize(shape_input_nn[0:2])
+        X_train[index, :, :, :] = prepare_x_train(image)
+
+        # create Y_train
+        y_label = prepare_y_train(int(identity), num_id)
+        Y_train[index, :] = y_label
+        index += 1
+
+        flipped_image = flip_image_horizontally(image)
+        X_train[index, :, :, :] = prepare_x_train(flipped_image)
+        Y_train[index, :] = y_label
+        index += 1
+
+        rotated_image_right = sci.rotate(image, 5, reshape=False)
+        X_train[index, :, :, :] = prepare_x_train(rotated_image_right)
+        Y_train[index, :] = y_label
+        index += 1
+        print str(index)
 
     print "dimensione x_train: " + str(X_train.shape)
     print "dimensione y_train: " + str(Y_train.shape)
@@ -151,11 +132,6 @@ def freeze_layers(model, n_layers_to_freeze):
     for layer in model.layers[:n_layers_to_freeze]:
         layer.trainable = False
     return model
-
-
-def print_layers(nn_model):
-    for i, layer in enumerate(nn_model.layers):
-        print str(i) + layer.name
 
 
 def create_resnet_model(num_classes, shape_input_nn):
@@ -220,31 +196,25 @@ def compile_model(model, learning_rate):
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     save_checkpoint = ModelCheckpoint(filepath='/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".{epoch:02d}.h5",
                                       monitor='val_loss', verbose=0, save_best_only=False,
-                                      save_weights_only=False, period=2)
-    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
+                                      save_weights_only=False, period=5)
+    model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=1,
                            callbacks=[save_checkpoint])
     return model_to_fine_tune
 
 
 halfGPU()
 
-# path of market
-id_int_dictionary = count_id(TRAINDATA_PATH)
+trainlist_file = open(PATH_LIST_OF_TRAINFILES, 'r')
+num_imgs = count_images(trainlist_file)
+trainlist_file.seek(0)
 
-num_ID = len(id_int_dictionary)
-print "num of identities: " + str(num_ID)
+traindata = create_trainData_data_augmentation(SHAPE_INPUT_NN, trainlist_file, num_imgs, NUM_OF_ID_TRAIN)
+trainlist_file.close()
 
-# use one of the following 2 lines of code for choosing to train data normally or with data augmentation
-# then replace in fine_tune_model the correct parameter for trained data and eventually the name of the model
-# to save
 
-traindata = create_trainData(SHAPE_INPUT_NN, TRAINDATA_PATH, id_int_dictionary, num_ID)
-#traindata = create_trainData_data_augmentation(SHAPE_INPUT_NN, TRAINDATA_PATH, id_int_dictionary, num_ID)
-
-model = create_resnet_model(num_ID, SHAPE_INPUT_NN)
+model = create_resnet_model(NUM_OF_ID_TRAIN, SHAPE_INPUT_NN)
 model = freeze_layers(model, NUM_LAYERS_TO_FREEZE)
 model = compile_model(model, LEARNING_RATE)
-print_layers(model)
 print model.summary()
 model = fine_tune_model(model, NUM_EPOCHS, BATCH_SIZE, traindata)
 

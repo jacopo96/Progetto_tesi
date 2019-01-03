@@ -13,7 +13,7 @@ NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [224, 224, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten_2'
-NAME_MODEL_TO_LOAD = 'Resnet_Market_config4.30.h5'
+NAME_MODEL_TO_LOAD = 'Resnet_Market_config4.50.h5'
 
 
 def halfGPU():
@@ -133,8 +133,8 @@ gallery_feature = fill_feature_matrix(gallery_feature, string_gallery_vector, mo
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature_config4.30.mat', mdict={'galFea': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature_config4.30.mat', mdict={'probFea': prob_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/gallery_feature_config4.50.mat', mdict={'galFea': gallery_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/Market_Resnet/features/prob_feature_config4.50.mat', mdict={'probFea': prob_feature})
 
 
 

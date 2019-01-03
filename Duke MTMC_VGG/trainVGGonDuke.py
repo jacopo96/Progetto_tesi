@@ -189,7 +189,7 @@ def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     save_checkpoint = ModelCheckpoint(
         filepath='/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".{epoch:02d}.h5",
         monitor='val_loss', verbose=0, save_best_only=False,
-        save_weights_only=False, period=20)
+        save_weights_only=False, period=2)
     history = model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
                                      callbacks=[save_checkpoint])
     return history

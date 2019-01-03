@@ -14,10 +14,10 @@ NUM_OF_CHARACTERS_OF_ID = 4
 GPU_FRACTION = 0.5
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED = 310
-NUM_EPOCHS_ONLY_LAST_TRAIN = 30
+NUM_EPOCHS_ONLY_LAST_TRAIN = 100
 NUM_EPOCHS_ENTINE_NETWORK_TRAINED = 20
-LEARNING_RATE_ENTINE_NETWORK = 1e-3
-LEARNING_RATE_LAST_LAYERS = 1e-2
+LEARNING_RATE_ENTINE_NETWORK = 1e-4
+LEARNING_RATE_LAST_LAYERS = 1e-3
 SHAPE_INPUT_NN = [299, 299, 3]
 BATCH_SIZE = 16
 TRAINDATA_PATH ='/media/data/dataset/Market-1501-v15.09.15/bounding_box_train/'
@@ -197,6 +197,7 @@ def fine_tune_model_only_last(model_to_fine_tune, nb_epoch, batch_size, traindat
     model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, shuffle=True, batch_size=batch_size,
                            verbose=2)
     return model_to_fine_tune
+
 
 halfGPU()
 

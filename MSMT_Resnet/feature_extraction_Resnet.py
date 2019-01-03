@@ -6,16 +6,16 @@ from keras.models import Model
 import tensorflow as tf
 import numpy as np
 import scipy.io as sio
-import os
 
 GPU_FRACTION = 0.5
 NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 SHAPE_INPUT_NN = [224, 224, 3]
 DIM_OUTPUT_FEATURE_LAYER = 2048
 NAME_FEATURE_EXTRACTION_LAYER = 'flatten_2'
-NAME_MODEL_TO_LOAD = 'Resnet_Duke_config3.30.h5'
-PATH_QUERY_IMAGES = '/media/data/dataset/Duke_online/query/'
-PATH_GALLERY_IMAGES = '/media/data/dataset/Duke_online/bounding_box_test/'
+NAME_MODEL_TO_LOAD = 'Resnet_MSMT_config3.10.h5'
+PATH_LIST_OF_QUERYFILES = '/media/data/dataset/MSMT17_V1/list_query.txt'
+PATH_LIST_OF_GALLERYFILES = '/media/data/dataset/MSMT17_V1/list_gallery.txt'
+PATH_TEST_IMAGES = '/media/data/dataset/MSMT17_V1/test/'
 
 
 def halfGPU():
@@ -32,15 +32,19 @@ def get_model_for_feature_extraction(model_path, name_last_layer):
     return model
 
 
-def count_images(path_data):
-    # @input : path of images
+def count_images(trainlist_file):
+    # @input : path of train images
     # @output : num of images in the directory
-    listing = os.listdir(path_data)
     num_imgs = 0
-    for filename in listing:
-        if filename.endswith(".jpg"):
-            num_imgs += 1
+    for line in trainlist_file:
+        num_imgs +=1
     return num_imgs
+
+
+def read_line(line_of_file):
+    splitted_line = line_of_file.split()
+    img_path = splitted_line[0]
+    return img_path
 
 
 def image_read(img_path):
@@ -48,11 +52,11 @@ def image_read(img_path):
     return image
 
 
-def create_input_to_predict(img_filename, path_of_images):
-    # @input: string that identifies the image, path of the directory in which search for it
+def create_input_to_predict(path_of_image):
+    # @input: path of the image
     # @output : array ready to be predicted
     X_test = np.empty((1, SHAPE_INPUT_NN[0], SHAPE_INPUT_NN[1], SHAPE_INPUT_NN[2]), 'float32')
-    image = image_read(path_of_images + img_filename).resize(SHAPE_INPUT_NN[0:2])
+    image = image_read(path_of_image).resize(SHAPE_INPUT_NN[0:2])
     x = img_to_array(image)
     x = x[:, :, ::-1]
     x[:, :, 0] -= NORMALIZING_COSTANTS[0]
@@ -68,15 +72,14 @@ def print_percentage(index, num_tot_iteration):
     print '%01d' % percentage + '%'
 
 
-def fill_feature_matrix(feature_matrix, model, path_of_images):
+def fill_feature_matrix(feature_matrix, model, datalist_file, num_imgs):
     index = 0
-    listing = os.listdir(path_of_images)
-    listing.sort()
-    num_tot_iteration = len(listing)
-    for filename in listing:
-        print_percentage(index, num_tot_iteration)
-        prediction = model.predict(create_input_to_predict(filename, path_of_images))
-        feature_matrix[index, :] = prediction.squeeze()
+    for line in datalist_file:
+        print_percentage(index, num_imgs)
+        img_path = read_line(line)
+        prediction = model.predict(create_input_to_predict( PATH_TEST_IMAGES + img_path))
+        prediction = prediction.transpose()
+        feature_matrix[:, index] = prediction.squeeze()
         index += 1
     return feature_matrix
 
@@ -87,28 +90,30 @@ halfGPU()
 
 model = get_model_for_feature_extraction('/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_LOAD, NAME_FEATURE_EXTRACTION_LAYER)
 
-prob_feature = np.empty((count_images(PATH_QUERY_IMAGES), DIM_OUTPUT_FEATURE_LAYER))
-gallery_feature = np.empty((count_images(PATH_GALLERY_IMAGES),DIM_OUTPUT_FEATURE_LAYER))
+querylist_file = open(PATH_LIST_OF_QUERYFILES, 'r')
+gallerylist_file = open(PATH_LIST_OF_GALLERYFILES, 'r')
 
+num_query_imgs = count_images(querylist_file)
+prob_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, num_query_imgs))
+querylist_file.seek(0)
+
+num_gallery_imgs = count_images(gallerylist_file)
+gallery_feature = np.empty((DIM_OUTPUT_FEATURE_LAYER, num_gallery_imgs))
+gallerylist_file.seek(0)
+
+print ('NAME MODEL: ' + NAME_MODEL_TO_LOAD)
 print('PROB_FEATURE_FILL:')
-prob_feature = fill_feature_matrix(prob_feature, model, PATH_QUERY_IMAGES)
+prob_feature = fill_feature_matrix(prob_feature, model, querylist_file, num_query_imgs)
+querylist_file.close()
 print('GALLERY_FEATURE_FILL:')
-gallery_feature = fill_feature_matrix(gallery_feature, model, PATH_GALLERY_IMAGES)
+gallery_feature = fill_feature_matrix(gallery_feature, model, gallerylist_file, num_gallery_imgs)
+gallerylist_file.close()
 
 
 print " dim gallery_feature: " + str(gallery_feature.shape)
 print " dim prob_feature: " + str(prob_feature.shape)
 
-sio.savemat('/home/jansaldi/Progetto-tesi/DukeMTMC_Resnet/features/gallery_feature_config3.30.mat', mdict={'gal': gallery_feature})
-sio.savemat('/home/jansaldi/Progetto-tesi/DukeMTMC_Resnet/features/prob_feature_config3.30.mat', mdict={'prob': prob_feature})
-
-
-
-
-
-
-
-
-
+sio.savemat('/home/jansaldi/Progetto-tesi/MSMT_Resnet/features/gallery_feature_config3.10.mat', mdict={'galFea': gallery_feature})
+sio.savemat('/home/jansaldi/Progetto-tesi/MSMT_Resnet/features/prob_feature_config3.10.mat', mdict={'probFea': prob_feature})
 
 

@@ -18,8 +18,8 @@ NORMALIZING_COSTANTS = [103.939, 116.779, 123.68]
 GPU_FRACTION = 0.5
 NUM_LAYERS_TO_FREEZE_ONLY_LAST_TRAINED = 173
 INDEX_LAST_LAYER = 176
-NUM_EPOCHS_ONLY_LAST_TRAIN = 100
-NUM_EPOCHS_ENTINE_NETWORK_TRAINED = 50
+NUM_EPOCHS_ONLY_LAST_TRAIN = 200
+NUM_EPOCHS_ENTINE_NETWORK_TRAINED = 100
 LEARNING_RATE_ENTINE_NETWORK = 1e-4
 LEARNING_RATE_LAST_LAYERS = 1e-3
 SHAPE_INPUT_NN = (224, 224, 3)
@@ -237,7 +237,7 @@ def compile_model(model, learning_rate):
 def fine_tune_model(model_to_fine_tune, nb_epoch, batch_size, traindata):
     save_checkpoint = ModelCheckpoint(filepath='/home/jansaldi/Progetto-tesi/models/' + NAME_MODEL_TO_SAVE + ".{epoch:02d}.h5",
                                       monitor='val_loss', verbose=0, save_best_only=False,
-                                      save_weights_only=False, period=10)
+                                      save_weights_only=False, period=5)
     history = model_to_fine_tune.fit(traindata[0], traindata[1], nb_epoch=nb_epoch, batch_size=batch_size, verbose=2,
                                      callbacks=[save_checkpoint])
     return history
